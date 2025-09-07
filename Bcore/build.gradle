@@ -15,7 +15,7 @@ android {
         externalNativeBuild {
             ndkBuild {
                 // 设置支持的SO库架构
-                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86'
+                abiFilters 'arm64-v8a'
             }
         }
     }
@@ -73,7 +73,7 @@ dependencies {
     implementation fileTree(dir: "libs", include: ["*.jar", "*.aar"])
     implementation 'androidx.appcompat:appcompat:1.2.0'
 
-    implementation 'me.weishu:free_reflection:3.0.1'
+    implementation 'com.github.tiann:FreeReflection:3.2.2'
     implementation "com.github.CodingGay.BlackReflection:core:$rootProject.ext.blackReflection"
     implementation project(':Bcore:black-fake')
     implementation project(':Bcore:black-hook')

@@ -12,6 +12,7 @@ cmake_minimum_required(VERSION 3.4.1)
 include_directories(JniHook)
 include_directories(./)
 
+add_subdirectory(Dobby)
 aux_source_directory(./ SRC1)
 aux_source_directory(Utils SRC2)
 aux_source_directory(Hook SRC3)
@@ -52,4 +53,5 @@ target_link_libraries( # Specifies the target library.
         # included in the NDK.
         ${log-lib}
         z
+        dobby
         )

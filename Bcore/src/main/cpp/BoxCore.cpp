@@ -5,12 +5,13 @@
 #include "BoxCore.h"
 #include "Log.h"
 #include "IO.h"
+#include "anti_detect.h"
 #include <jni.h>
-#include <JniHook/JniHook.h>
-#include <Hook/VMClassLoaderHook.h>
-#include <Hook/UnixFileSystemHook.h>
-#include <Hook/BinderHook.h>
-#include <Hook/RuntimeHook.h>
+#include "JniHook/JniHook.h"
+#include "Hook/VMClassLoaderHook.h"
+#include "Hook/UnixFileSystemHook.h"
+#include "Hook/BinderHook.h"
+#include "Hook/RuntimeHook.h"
 #include "Utils/HexDump.h"
 
 struct {
@@ -228,23 +229,47 @@ void sig_handler(int signo, siginfo_t *info, void *data) {
 #error "Unsupported architecture"
 #endif
 
-    __android_log_print(ANDROID_LOG_DEBUG, TAG, "c = %lu", syscall_number);
+//    __android_log_print(ANDROID_LOG_DEBUG, TAG, "c = %lu", syscall_number);
 
     switch (syscall_number) {
+        case __NR_clone: {
+            // 1. 从寄存器中获取 clone 的参数
+            // aarch64: flags在regs[0], child_stack在regs[1]
+            unsigned long clone_flags = SYSARG_1;
+            void* child_stack = (void*)SYSARG_2;
+
+            // 2. 打印你能获取到的底层信息
+            __android_log_print(ANDROID_LOG_DEBUG, TAG,"Syscall __NR_clone trapped!");
+            __android_log_print(ANDROID_LOG_DEBUG, TAG,"  >> flags: 0x%lx", clone_flags);
+            __android_log_print(ANDROID_LOG_DEBUG, TAG,"  >> child_stack: %p", child_stack);
+
+            // 3. (高难度) 尝试解析child_stack来寻找start_routine
+            // !! 警告：这部分代码非常脆弱，严重依赖libc内部实现 !!
+            // 你需要逆向分析libc.so中的pthread_create，才能知道start_routine在栈上的确切偏移
+            // 此处仅为概念，不保证能工作
+            // void* start_routine = *((void**)( (char*)child_stack - STACK_OFFSET_OF_START_ROUTINE) );
+            // LOGD("  >> Guessed start_routine: %p", start_routine);
+
+            // 4. 让原始的clone调用继续执行
+#if defined(__aarch64__)
+            ((ucontext_t *) data)->uc_mcontext.regs[0] = OriSyscall(__NR_clone, SYSARG_1, SYSARG_2, SYSARG_3, SYSARG_4, SYSARG_5, SYSARG_6);
+#elif defined(__arm__)
+            ((ucontext_t *) data)->uc_mcontext.arm_r0 = OriSyscall(__NR_clone, SYSARG_1, SYSARG_2, SYSARG_3, SYSARG_4, SYSARG_5, SYSARG_6);
+#endif
+            break; // break是必须的！
+        }
         case __NR_openat: {
-//            char temp_convert[PATH_MAX] = {0};
-//            char temp[PATH_MAX] = {0};
-//            int fd = (int) SYSARG_1;
-//            const char *pathname = (const char *) SYSARG_2;
-//            int flags = (int) SYSARG_3;
-//            int mode = (int) SYSARG_4;
-//            const char *pathnameAfterFd = convertPathWithDfd(fd,pathname,temp_convert,"__openat");
-//            const char *relocated_path = relocate_path(pathnameAfterFd, temp, sizeof(temp));
+            char temp_convert[PATH_MAX] = {0};
+            char temp[PATH_MAX] = {0};
             // 重新分配系统调用参数
             int fd = (int) SYSARG_1;
             const char *pathname = (const char *) SYSARG_2;
             int flags = (int) SYSARG_3;
             int mode = (int) SYSARG_4;
+            __android_log_print(ANDROID_LOG_DEBUG, TAG, "openat path = %s", pathname);
+//            const char *pathnameAfterFd = convertPathWithDfd(fd,pathname,temp_convert,"__openat");
+//            const char *relocated_path = relocate_path(pathnameAfterFd, temp, sizeof(temp));
+            const char *relocated_path =  IO::redirectPath(pathname);
 #if defined(__aarch64__)
 //            ((ucontext_t *) data)->uc_mcontext.regs[0] = (uint64_t)fd;
 //            ((ucontext_t *) data)->uc_mcontext.regs[1] = (uint64_t)relocated_path;
@@ -263,12 +288,12 @@ void sig_handler(int signo, siginfo_t *info, void *data) {
             if (__predict_true(pathname)) {
                 // 执行系统调用
 #if defined(__aarch64__)
-                ((ucontext_t *) data)->uc_mcontext.regs[0] = OriSyscall(__NR_openat, fd, (uint64_t)pathname, flags, mode, SECMAGIC, SECMAGIC);
+                ((ucontext_t *) data)->uc_mcontext.regs[0] = OriSyscall(__NR_openat, fd, (uint64_t)relocated_path, flags, mode, SECMAGIC, SECMAGIC);
 #elif defined(__arm__)
                 ((ucontext_t *) data)->uc_mcontext.arm_r0 = OriSyscall(__NR_openat, fd, (uint32_t)relocated_path, flags, mode, SECMAGIC, SECMAGIC);
 #endif
             }
-            __android_log_print(ANDROID_LOG_DEBUG, TAG, "c relocated_path=%s", pathname);
+            __android_log_print(ANDROID_LOG_DEBUG, TAG, "c relocated_path=%s", relocated_path);
             break;
         }
         case __NR_fstat: {
@@ -288,7 +313,7 @@ void sig_handler(int signo, siginfo_t *info, void *data) {
     }
 }
 
-void init_seccomp(JNIEnv *env, jclass clazz) {
+void init_seccomp() {
     struct sock_filter filter[] = {
             BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
             BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_seccomp, 0, 2),
@@ -370,5 +395,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
         return JNI_EVERSION;
     }
     registerMethod(env);
+//    init_anti_detect();
+//    init_seccomp();
     return JNI_VERSION_1_6;
 }
