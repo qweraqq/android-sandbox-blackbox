@@ -55,8 +55,6 @@ class HomeFrag : Fragment() {
 
   private var popupMenu: PopupMenu? = null
 
-  private var banner: Banner? = null
-
   private lateinit var appInfos: ArrayList<AppInfo>
 
   companion object {
@@ -84,28 +82,7 @@ class HomeFrag : Fragment() {
     //    }
     normalColor = ContextCompat.getColor(context!!, R.color.indicator_normal)
     checkedColor = ContextCompat.getColor(context!!, R.color.indicator_selected)
-    banner = binding.banner
-    banner!!.post {
-      banner!!.layoutParams.width = Vu.screenWidth()
-      banner!!.layoutParams.height = (Vu.screenWidth() / 2.5).toInt()
-      banner!!.requestLayout()
-    }
-    banner!!.setIndicator(
-      IndicatorView(requireContext())
-        .setIndicatorColor(normalColor)
-        .setIndicatorSpacing(IndicatorUtils.dp2px(4f).toFloat())
-        .setIndicatorSelectorColor(checkedColor)
-        .setIndicatorStyle(INDICATOR_CIRCLE)
-    )
 
-    banner!!.adapter = ViewPager2Adapter(getData())
-    (banner!!.adapter as ViewPager2Adapter).setOnItemClickListener {
-      if (TextUtils.isEmpty(it.url)) {
-        GuideHelper.showGuideDlg(requireContext())
-      } else {
-        MarketHelper.goToAppMarket(requireActivity(), it.url)
-      }
-    }
 
     appInstallViewModel = ViewModelProvider(this).get(AppInstallViewModel::class.java)
     appInstallViewModel.registerReceiver(requireContext())
@@ -155,31 +132,15 @@ class HomeFrag : Fragment() {
 
   override fun setUserVisibleHint(isVisibleToUser: Boolean) {
     super.setUserVisibleHint(isVisibleToUser)
-    if (isVisibleToUser) {
-      startBannerTurning()
-    } else {
-      stopBannerTurning()
-    }
   }
 
   override fun onResume() {
     super.onResume()
-    if (userVisibleHint) {
-      startBannerTurning()
-    }
+
   }
 
   override fun onPause() {
     super.onPause()
-    stopBannerTurning()
-  }
-
-  private fun startBannerTurning() {
-    banner?.startTurning()
-  }
-
-  private fun stopBannerTurning() {
-    banner?.stopTurning()
   }
 
   private fun initData() {

@@ -24,18 +24,6 @@ android {
     flavorDimensions "abi"
 
     productFlavors {
-        SandBox32 {
-            applicationId "com.hello.miheapp"
-            ndk {
-                abiFilters "armeabi-v7a"
-            }
-            resValue "string", "app_name", "秘盒空间"
-            buildConfigField "int", "APP_ARME_ABI_TYPE", "32"
-            manifestPlaceholders = [APP_ICON      : "@mipmap/ic_launcher",
-                                    APP_ROUND_ICON: "@mipmap/ic_launcher_round"]
-            matchingFallbacks = ["v7"]
-        }
-
         SandBox64 {
             applicationId "com.hello.miheapp"
             ndk {

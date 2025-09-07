@@ -9,16 +9,11 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <include
-      android:id="@+id/toolbar_layout"
-      layout="@layout/view_toolbar"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content" />
-
-    <com.hello.sandbox.view.pager2banner.Banner
-      android:id="@+id/fake_home_banner"
-      android:layout_width="match_parent"
-      android:layout_height="160dp" />
+<!--    <include-->
+<!--      android:id="@+id/toolbar_layout"-->
+<!--      layout="@layout/view_toolbar"-->
+<!--      android:layout_width="match_parent"-->
+<!--      android:layout_height="wrap_content" />-->
 
     <include
       android:id="@+id/il_fake_home_center_layout"

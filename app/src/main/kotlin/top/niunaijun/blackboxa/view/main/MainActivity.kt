@@ -29,7 +29,6 @@ import top.niunaijun.blackboxa.util.inflate
 import top.niunaijun.blackboxa.view.apps.AppsFragment
 import top.niunaijun.blackboxa.view.base.LoadingActivity
 import top.niunaijun.blackboxa.view.fake.FakeManagerActivity
-import top.niunaijun.blackboxa.view.list.ListActivity
 import top.niunaijun.blackboxa.view.setting.SettingActivity
 
 class MainActivity : LoadingActivity() {
@@ -47,7 +46,6 @@ class MainActivity : LoadingActivity() {
     setContentView(viewBinding.root)
     initToolbar(viewBinding.toolbarLayout.toolbar, R.string.app_name)
     initViewPager()
-    initFab()
     initToolbarSubTitle()
   }
 
@@ -96,52 +94,7 @@ class MainActivity : LoadingActivity() {
     )
   }
 
-  private fun initFab() {
-    viewBinding.fab.setOnClickListener {
-      val userId = viewBinding.viewPager.currentItem
-      val intent = Intent(this, ListActivity::class.java)
-      intent.putExtra("userID", userId)
-      apkPathResult.launch(intent)
-    }
-    viewBinding.fab.setOnLongClickListener {
-      val path =
-        "/sdcard/Download/TanTanApks/tantan-5.7.2.2_3572200-withqt_gms_v8_dxx_tanker_base_dont_move.apk"
-      val downloadManager: DownloadManager =
-        getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
-      val apkFile = File(path)
-      if (apkFile.exists()) {
-        install(this@MainActivity, apkFile)
-        return@setOnLongClickListener true
-      }
-
-      val request =
-        DownloadManager.Request(
-          Uri.parse(
-            "https://apk.p1staff.com/signed-release-apks/tantan_3572200_5.7.2.2/tantan-5.7.2.2_3572200-withqt_gms_v8_dxx_tanker_base_dont_move.apk"
-          )
-        )
-
-      try {
-        request.setDestinationInExternalPublicDir(
-          "TanTanApks",
-          "tantan-5.7.2.2_3572200-withqt_gms_v8_dxx_tanker_base_dont_move.apk"
-        )
-      } catch (e: Exception) {
-        e.printStackTrace()
-      }
-
-      request.setDestinationUri(Uri.fromFile(apkFile))
-      request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-      request.setTitle("正在下载探探")
-      request.setDescription("Open when finish download!")
-      request.setMimeType("application/vnd.android.package-archive")
-      val dlid = downloadManager.enqueue(request)
-
-      listener(dlid, this@MainActivity, path)
-      return@setOnLongClickListener true
-    }
-  }
 
   private fun listener(dlid: Long, context: Context, filename: String) {
 

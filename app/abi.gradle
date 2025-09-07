@@ -2,13 +2,6 @@ android {
     flavorDimensions "abi"
 
     productFlavors {
-        v7 {
-            dimension "abi"
-            ndk {
-                abiFilters "armeabi-v7a"
-            }
-        }
-
         v8 {
             dimension "abi"
             ndk {

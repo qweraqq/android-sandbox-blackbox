@@ -204,13 +204,107 @@ void sig_callback(int signo, siginfo_t *info, void *data){
             break;
     }
 }
+void sig_handler(int signo, siginfo_t *info, void *data) {
+    int my_signo = info->si_signo;
+    unsigned long syscall_number;
+    unsigned long SYSARG_1, SYSARG_2, SYSARG_3, SYSARG_4, SYSARG_5, SYSARG_6;
+#if defined(__aarch64__) // 64-bit architecture
+    syscall_number = ((ucontext_t *) data)->uc_mcontext.regs[8];
+    SYSARG_1 = ((ucontext_t *) data)->uc_mcontext.regs[0];
+    SYSARG_2 = ((ucontext_t *) data)->uc_mcontext.regs[1];
+    SYSARG_3 = ((ucontext_t *) data)->uc_mcontext.regs[2];
+    SYSARG_4 = ((ucontext_t *) data)->uc_mcontext.regs[3];
+    SYSARG_5 = ((ucontext_t *) data)->uc_mcontext.regs[4];
+    SYSARG_6 = ((ucontext_t *) data)->uc_mcontext.regs[5];
+#elif defined(__arm__) // 32-bit architecture
+    syscall_number = ((ucontext_t *) data)->uc_mcontext.arm_r7;
+    SYSARG_1 = ((ucontext_t *) data)->uc_mcontext.arm_r0;
+    SYSARG_2 = ((ucontext_t *) data)->uc_mcontext.arm_r1;
+    SYSARG_3 = ((ucontext_t *) data)->uc_mcontext.arm_r2;
+    SYSARG_4 = ((ucontext_t *) data)->uc_mcontext.arm_r3;
+    SYSARG_5 = ((ucontext_t *) data)->uc_mcontext.arm_r4;
+    SYSARG_6 = ((ucontext_t *) data)->uc_mcontext.arm_r5;
+#else
+#error "Unsupported architecture"
+#endif
+
+    __android_log_print(ANDROID_LOG_DEBUG, TAG, "c = %lu", syscall_number);
+
+    switch (syscall_number) {
+        case __NR_openat: {
+//            char temp_convert[PATH_MAX] = {0};
+//            char temp[PATH_MAX] = {0};
+//            int fd = (int) SYSARG_1;
+//            const char *pathname = (const char *) SYSARG_2;
+//            int flags = (int) SYSARG_3;
+//            int mode = (int) SYSARG_4;
+//            const char *pathnameAfterFd = convertPathWithDfd(fd,pathname,temp_convert,"__openat");
+//            const char *relocated_path = relocate_path(pathnameAfterFd, temp, sizeof(temp));
+            // 重新分配系统调用参数
+            int fd = (int) SYSARG_1;
+            const char *pathname = (const char *) SYSARG_2;
+            int flags = (int) SYSARG_3;
+            int mode = (int) SYSARG_4;
+#if defined(__aarch64__)
+//            ((ucontext_t *) data)->uc_mcontext.regs[0] = (uint64_t)fd;
+//            ((ucontext_t *) data)->uc_mcontext.regs[1] = (uint64_t)relocated_path;
+//            ((ucontext_t *) data)->uc_mcontext.regs[2] = (uint64_t)flags;
+//            ((ucontext_t *) data)->uc_mcontext.regs[3] = (uint64_t)mode;
+            ((ucontext_t *) data)->uc_mcontext.regs[0] = (uint64_t)fd;
+            ((ucontext_t *) data)->uc_mcontext.regs[1] = (uint64_t)pathname;
+            ((ucontext_t *) data)->uc_mcontext.regs[2] = (uint64_t)flags;
+            ((ucontext_t *) data)->uc_mcontext.regs[3] = (uint64_t)mode;
+#elif defined(__arm__)
+            ((ucontext_t *) data)->uc_mcontext.arm_r0 = (uint32_t)fd;
+            ((ucontext_t *) data)->uc_mcontext.arm_r1 = (uint32_t)relocated_path;
+            ((ucontext_t *) data)->uc_mcontext.arm_r2 = (uint32_t)flags;
+            ((ucontext_t *) data)->uc_mcontext.arm_r3 = (uint32_t)mode;
+#endif
+            if (__predict_true(pathname)) {
+                // 执行系统调用
+#if defined(__aarch64__)
+                ((ucontext_t *) data)->uc_mcontext.regs[0] = OriSyscall(__NR_openat, fd, (uint64_t)pathname, flags, mode, SECMAGIC, SECMAGIC);
+#elif defined(__arm__)
+                ((ucontext_t *) data)->uc_mcontext.arm_r0 = OriSyscall(__NR_openat, fd, (uint32_t)relocated_path, flags, mode, SECMAGIC, SECMAGIC);
+#endif
+            }
+            __android_log_print(ANDROID_LOG_DEBUG, TAG, "c relocated_path=%s", pathname);
+            break;
+        }
+        case __NR_fstat: {
+            char TmePath[PATH_MAX];
+            snprintf(TmePath, sizeof(TmePath), "/proc/self/fd/%lu", SYSARG_1);
+            readlink(TmePath, TmePath, PATH_MAX);
+            __android_log_print(ANDROID_LOG_DEBUG, TAG, "__NR_fstat path = %s", TmePath);
+#if defined(__aarch64__)
+            ((ucontext_t *) data)->uc_mcontext.regs[0] = OriSyscall(__NR_fstat, SYSARG_1, SYSARG_2, SECMAGIC, SECMAGIC, SECMAGIC, SECMAGIC);
+#elif defined(__arm__)
+            ((ucontext_t *) data)->uc_mcontext.arm_r0 = OriSyscall(__NR_fstat, SYSARG_1, SYSARG_2, SECMAGIC, SECMAGIC, SECMAGIC, SECMAGIC);
+#endif
+            break;
+        }
+        default:
+            break;
+    }
+}
 
 void init_seccomp(JNIEnv *env, jclass clazz) {
     struct sock_filter filter[] = {
             BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_seccomp, 0, 2),
+            BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[3])),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SECMAGIC, 8, 9),
+
+            BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_fstat, 0, 2),
+            BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[2])),
+            BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SECMAGIC, 4, 5),
+
+            BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
             BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_openat, 0, 2),
             BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[4])),
             BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SECMAGIC, 0, 1),
+
             BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
             BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP)
     };
@@ -222,7 +316,7 @@ void init_seccomp(JNIEnv *env, jclass clazz) {
     struct sigaction sa;
     sigset_t sigset;
     sigfillset(&sigset);
-    sa.sa_sigaction = sig_callback;
+    sa.sa_sigaction = sig_handler;
     sa.sa_mask = sigset;
     sa.sa_flags = SA_SIGINFO;
 

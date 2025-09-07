@@ -1,5 +1,6 @@
 package com.hello.sandbox.ui.home
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -8,6 +9,9 @@ import android.widget.RelativeLayout
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import com.hello.sandbox.Constant
+import com.hello.sandbox.common.util.ClipboardUtil
+import com.hello.sandbox.common.util.ToastUtil
+import com.hello.sandbox.common.util.ViewUtil
 import com.hello.sandbox.ui.WebviewAct
 import com.hello.sandbox.ui.about.AboutAct
 import com.hello.sandbox.ui.splash.LoginAct
@@ -16,12 +20,11 @@ import com.hello.sandbox.util.singleClickListener
 import com.hello.sandbox.view.BasePopup
 import com.lxj.xpopup.XPopup
 import com.lxj.xpopup.util.XPopupUtils
-import com.hello.sandbox.common.util.ClipboardUtil
-import com.hello.sandbox.common.util.ToastUtil
-import com.hello.sandbox.common.util.ViewUtil
 import top.niunaijun.blackboxa.R
 import top.niunaijun.blackboxa.bean.AppInfo
 import top.niunaijun.blackboxa.databinding.FragmentMeBinding
+import top.niunaijun.blackboxa.view.setting.SettingActivity
+
 
 class MeFrag : Fragment() {
   private lateinit var binding: FragmentMeBinding
@@ -57,7 +60,8 @@ class MeFrag : Fragment() {
   private fun initClickListener() {
     ViewUtil.singleClickListener(rlAbout) { AboutAct.start(context!!) }
     binding.rlQuestion.singleClickListener {
-      WebviewAct.start(requireContext(), Constant.URL_APP_QUESTION, "常见问题")
+      val intent: Intent = Intent(requireContext(), SettingActivity::class.java)
+      startActivity(intent)
     }
     binding.llHelp.singleClickListener {
       WebviewAct.start(requireContext(), Constant.URL_APP_FEEDBACK, "问题反馈")
